@@ -28,3 +28,5 @@ The result is the scrambled key.To unscramble, simply reverse the process and su
 Example: 3 - 4 would result in 9 (as if the 3 was actually 13).
 
 Of course, you can always use this program to unscramble your scrambled key if you have access to another computer and this program, but the whole point is that the process is very easy to reverse manually but still secure since only you know the crypto key used to scramble and unscramble the BitLocker recovery key.
+
+After scrambling or unscrambling a BitLocker key, you will be given the opportunity to save the information to a file. The file will contain the original key, the crypto key you supplied to either scramble or unscramble the BitLocker key, the resulting key after the scramble / unscramble operation, and any comment you wish to provide.

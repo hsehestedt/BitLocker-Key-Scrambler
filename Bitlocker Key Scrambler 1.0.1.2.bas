@@ -1,7 +1,7 @@
 ' BitLocker Key Scrambler
 '
-' Version 1.0.0.1
-' September 10, 2021
+' Version 1.0.1.2
+' September 11, 2021
 
 Option _Explicit
 Rem $DYNAMIC
@@ -10,12 +10,13 @@ $Console:Only
 _Source _Console
 Width 120, 30
 Option Base 1
-_ConsoleTitle "BitLocker Key Scrambler 1.0.0.1 by Hannes Sehestedt"
+_ConsoleTitle "BitLocker Key Scrambler 1.0.1.2 by Hannes Sehestedt"
 
 BeginProgram:
 Clear
 
 Dim BitLockerKey As String ' Original BitLocker key
+Dim Comment As String ' User comment to be saved to file along with key
 Dim CryptoCount As Integer ' Counter
 Dim CryptoKey As String ' Key used to scramble / unscramble BitLocker key
 Dim CryptoKeyLength As Integer ' Length of the Crypto Key supplied by the user
@@ -25,7 +26,9 @@ Dim Operation As Integer ' Set to "1" to scramble, "2" to unscramble
 Dim ProgramStartDir As String ' Stores the location from which the program is run
 Dim Shared RawBitLockerKey As String ' BitLocker key with dashes stripped off
 Dim RunAgain As String ' Yes or No response when asked if program should be run again
+Dim SaveAComment As String ' Will be set to "Y" if user wants to save a comment, "N" if not
 Dim SaveKey As String ' Save a Yes or No response indicating whether to save the scrambled / unscrambled key to a file
+Dim Temp As String ' Temporary storage
 Dim Shared TestStatus As Integer
 Dim x As Integer ' General purpose variable used as counter in FOR NEXT loops
 Dim Shared YN As String ' Yes or No response from user
@@ -37,8 +40,8 @@ ProgramStartDir$ = _CWD$
 ' Gather all the data needed from user
 
 GetBitLockerKey:
-ClearScreen
 Do
+    ClearScreen
     Print "Please enter the BitLocker key to scramble or the scrambled key to unscramble."
     Print "You can enter the key with or without dashes in it."
     Print
@@ -48,7 +51,7 @@ Do
 Loop While BitLockerKey$ = ""
 
 If UCase$(Left$(BitLockerKey$, 4)) = "HELP" Then
-    Cls
+    ClearScreen
     Print "Assume you use a laptop that uses BitLocker encryption. What would you do if you ran into a situation where you had"
     Print "to supply your BitLocker recovery key?"
     Print
@@ -76,7 +79,7 @@ If UCase$(Left$(BitLockerKey$, 4)) = "HELP" Then
     Print
     Print "Example: 3 - 4 would result in 9 (as if the 3 was actually 13)."
     Pause
-    Cls
+    ClearScreen
     Print "Of course, you can always use this program to unscramble your scrambled key if you have access to another computer and"
     Print "this program, but the whole point is that the process is very easy to reverse manually but still secure since only you"
     Print "know the crypto key used to scramble and unscramble the BitLocker recovery key."
@@ -90,17 +93,27 @@ TestBitLockerKey (BitLockerKey$)
 If TestStatus = 0 Then
     ClearScreen
     Print "You did not enter a valid key. The key must contain 48 numerical digits or 8 groups of 6 numerical digits"
-    Print "seperated by a dash."
+    Print "seperated by dashes."
     Print
     Print "Please enter a valid key."
     Pause
     GoTo GetBitLockerKey
 End If
 
-' RawBitLockerKey$ now holds the key with all dashes removed. Set BitLockerKey$ to this so that
-' we no longer need to deal with the dashes.
+' If BitLockerKey$ is 55 characters long then it already has dashes in it. If it does not, then add dashes so that
+' it is properly formatted for later. Note that RawBitLockerKey$ now holds the key with all dashes removed.
 
-BitLockerKey$ = RawBitLockerKey$
+If Len(BitLockerKey$) = 48 Then
+    Temp$ = "" ' Set initial value to an empty string
+    For x = 1 To 48
+        Temp$ = Temp$ + Mid$(BitLockerKey$, x, 1)
+        Select Case x
+            Case 6, 12, 18, 24, 30, 36, 42
+                Temp$ = Temp$ + "-"
+        End Select
+    Next x
+    BitLockerKey$ = Temp$
+End If
 
 GetCryptoKey:
 
@@ -143,7 +156,7 @@ For x = 1 To CryptoKeyLength
 Next x
 
 For x = 1 To 48
-    BitLockerKeyArray(x) = Val(Mid$(BitLockerKey$, x, 1))
+    BitLockerKeyArray(x) = Val(Mid$(RawBitLockerKey$, x, 1))
 Next x
 
 ' Based upon the choice made by the user, go to the routine to scramble or unscramble
@@ -263,18 +276,46 @@ SaveKeyToFile:
 ' the we will create a file to which the key will be saved. Otherwise, we will append the key
 ' to the existing file without deleting the previous file.
 
-Cls
+ClearScreen
 
 Do
     Input "Do you want to save a copy of this key to a file for easy access"; SaveKey$
 Loop While SaveKey$ = ""
 
 YesOrNo SaveKey$
-
-Select Case YN$
+SaveKey$ = YN$
+Select Case SaveKey$
     Case "X"
         GoTo SaveKeyToFile
     Case "Y"
+
+        ' User wants to save a comment. Get the comment from user
+
+        GetComment:
+
+        Do
+            ClearScreen
+            Input "Do you want to save a comment along with the key"; SaveAComment$
+        Loop While SaveAComment$ = ""
+
+        YesOrNo SaveAComment$
+        SaveAComment$ = YN$
+
+        Select Case YN$
+            Case "X"
+                GoTo GetComment
+            Case "Y"
+                Do
+                    ClearScreen
+                    Input "Please enter your comment: ", Comment$
+                Loop While Comment$ = ""
+            Case "N"
+
+                ' If user does not want to save a comment, make sure that Comment$ is an empty string.
+
+                Comment$ = ""
+        End Select
+
         ff = FreeFile
 
         If _FileExists(ProgramStartDir$ + "\Key.txt") Then
@@ -283,19 +324,37 @@ Select Case YN$
             Open (ProgramStartDir$ + "\Key.txt") For Output As #ff
         End If
 
-        Print #ff, "-------------------------------------------------------"
+        Print #ff, "---------------------------------------------------------------------------"
         Print #ff, "Key saved on "; Date$; " at "; Time$
 
+        ' If the user supplied a comment, save it to the file.
+
+        If Comment$ <> "" Then
+            Print #ff, "Comment: "; Comment$
+        End If
+
+        Print #ff, "Original Key:    "; BitLockerKey$
+
         If Operation = 1 Then
-            Print #ff, "Scrambled Key:"
+            Print #ff, "Scrambled Key:   ";
         Else
-            Print #ff, "Unscrambled Key:"
+            Print #ff, "Unscrambled Key: ";
         End If
 
         Print #ff, ScrambledKey$
-        Print #ff, "-------------------------------------------------------"
+        Print #ff, "Crypto Key:      "; CryptoKey$
+        Print #ff, "---------------------------------------------------------------------------"
         Print #ff, ""
         Close #ff
+
+        ClearScreen
+        Print "Key has been saved to the following file:"
+        Print
+        Color 0, 10: Print ProgramStartDir$; "\Key.txt": Color 15
+        Print
+        Print "If this file was already present, this key was added to the file. Previously saved keys have NOT been erased."
+        Print "The crypto key you supplied is also saved to this file so make sure to ";: Color 0, 10: Print "PROTECT THIS FILE!": Color 15
+        Pause
     Case "N"
         Exit Select
 End Select
@@ -446,4 +505,9 @@ End Sub
 '
 ' 1.0.0.1 - Sep 10, 2021
 ' Initial Release
+'
+' 1.0.1.2 - Sep 11, 2021
+' If the user chooses to save the scrambled / unscrambled key to a file, we will now ask if they would like to
+' save a comment as well. We also made the output to file look a bit better. Also fixed a couple minor bugs
+' that caused display of data to be a little sloppy.
 
