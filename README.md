@@ -1,4 +1,7 @@
 # BitLocker-Key-Scrambler
+
+Please see the release notes within the ZIP file for the list of changes in this release.
+
 Scrambles / Unscrambles a BitLocker recovery key so you can safely keep it with you or your system
 
 I carry a laptop that has BitLocker encryption on the entire hard disk. On a few occasions I have done something that caused Windows to ask me for the BitLocker recovery key before the system was allowed to boot.
